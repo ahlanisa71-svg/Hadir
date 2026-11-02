@@ -25,6 +25,22 @@ jobs:
           npx cap add android
           sed -i 's#<application#<uses-permission android:name="android.permission.CAMERA"/>\n    <uses-feature android:name="android.hardware.camera" android:required="false"/>\n    <application#' android/app/src/main/AndroidManifest.xml
           npx cap sync android
+      - name: Ganti ikon aplikasi
+        run: |
+          pip install pillow
+          python3 - <<'PY'
+          from PIL import Image
+          base = 'android/app/src/main/res'
+          src = Image.open('icon-maskable-512.png').convert('RGBA')
+          legacy = {'mdpi': 48, 'hdpi': 72, 'xhdpi': 96, 'xxhdpi': 144, 'xxxhdpi': 192}
+          fg = {'mdpi': 108, 'hdpi': 162, 'xhdpi': 216, 'xxhdpi': 324, 'xxxhdpi': 432}
+          for d, n in legacy.items():
+              p = f'{base}/mipmap-{d}'
+              for f in ('ic_launcher.png', 'ic_launcher_round.png'):
+                  src.resize((n, n), Image.LANCZOS).save(f'{p}/{f}')
+              src.resize((fg[d], fg[d]), Image.LANCZOS).save(f'{p}/ic_launcher_foreground.png')
+          open(f'{base}/values/ic_launcher_background.xml', 'w').write('<?xml version="1.0" encoding="utf-8"?><resources><color name="ic_launcher_background">#087F75</color></resources>')
+          PY
       - name: Build
         run: cd android && ./gradlew assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4

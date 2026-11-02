@@ -112,3 +112,4 @@ input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid v
  #toasts{bottom:100px}.overlay.show .modal{animation:sheet .25s ease}
 }
 @keyframes sheet{from{transform:translateY(40px)}to{transform:none}}
+@media(max-width:860px){.icon-btn.menu-btn{display:none!important}.crumb .muted{display:none}.crumb{padding-left:4px}}

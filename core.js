@@ -54,7 +54,7 @@ const ICONS = {
   eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>', logout: '<path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/>', refresh: '<path d="M20 11a8 8 0 00-14-4M4 4v4h4M4 13a8 8 0 0014 4M20 20v-4h-4"/>',
   camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>', back: '<path d="M15 5l-7 7 7 7"/>', star: '<rect x="5.5" y="5.5" width="13" height="13"/><rect x="5.5" y="5.5" width="13" height="13" transform="rotate(45 12 12)"/>',
   print: '<path d="M7 9V3h10v6M7 17H4v-6h16v6h-3M7 14h10v7H7z"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>', link: '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3A4 4 0 0011 18.7l1-1"/>',
-  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>', swap: '<path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>', alert: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>', megaphone: '<path d="M3 11v3l12 5V6L3 11z"/><path d="M7 14l1.5 5"/>'
+  pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0113 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/>', scan: '<path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M7 12h10"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>', swap: '<path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>', alert: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>', megaphone: '<path d="M3 11v3l12 5V6L3 11z"/><path d="M7 14l1.5 5"/>'
 };
 const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
@@ -64,7 +64,7 @@ const MENUS = [
   { id: 'wajah', l: 'Pendaftaran Wajah', i: 'face' }, { id: 'riwayat', l: 'Riwayat Kehadiran', i: 'clock' }, { id: 'kegiatan', l: 'Kegiatan & Jadwal', i: 'calendar' },
   { id: 'izin', l: 'Perizinan', i: 'file' }, { id: 'kelas', l: 'Kelas & Kamar', i: 'building' }, { id: 'alumni', l: 'Alumni', i: 'grad' }, { id: 'guru', l: 'Guru & Pengurus', i: 'badge' },
   { id: 'akun', l: 'Akun & Hak Akses', i: 'key', adminOnly: true }, { id: 'laporan', l: 'Laporan', i: 'chart' }, { id: 'notif', l: 'Notifikasi', i: 'bell' },
-  { id: 'perangkat', l: 'Perangkat Tablet', i: 'tablet' }, { id: 'sinkron', l: 'Backup & Sinkronisasi', i: 'cloud' }, { id: 'pengaturan', l: 'Pengaturan', i: 'gear', always: true }
+  { id: 'perangkat', l: 'Perangkat Tablet', i: 'tablet' }, { id: 'sinkron', l: 'Backup & Sinkronisasi', i: 'cloud' }, { id: 'pengaturan', l: 'Pengaturan', i: 'gear', always: true }, { id: 'lainnya', l: 'Lainnya', i: 'menu', always: true }
 ];
 const DEFAULT_AKSES = { dashboard: 'view', santri: 'view', absensi: 'edit', riwayat: 'view', kegiatan: 'edit', izin: 'edit', notif: 'view' };
 let ME = null;
@@ -165,7 +165,7 @@ const FACES = {
 };
 
 /* ---------- pengaturan pesantren ---------- */
-const CFG_DEF = { nama: 'Pondok Pesantren', alamat: '', telp: '', logo: '', tahunAjaran: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`, semester: 'Ganjil', wajahThr: 0.5, alfaBatas: 3, telatBatas: 5 };
+const CFG_DEF = { nama: 'Pondok Pesantren', alamat: '', telp: '', logo: '', tahunAjaran: `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`, semester: 'Ganjil', wajahThr: 0.5, kota: 'Jakarta', lat: -6.2088, lng: 106.8456, alfaBatas: 3, telatBatas: 5 };
 const CFG = () => ({ ...CFG_DEF, ...(DB.get('pengaturan', 'main') || {}) });
 function setCFG(patch) { const cur = DB.get('pengaturan', 'main') || { id: 'main' }; return DB.put('pengaturan', { ...cur, ...patch, id: 'main' }); }
 
@@ -378,10 +378,10 @@ function renderShell() {
   const c = CFG(); $('#app').className = 'app';
   $('#app').innerHTML = `<aside class="sidebar" id="sidebar"><div class="brand pattern">${c.logo ? `<img class="brand-logo" src="${esc(c.logo)}" alt="">` : `<div class="brand-mark">${ic('star')}</div>`}<div><div class="brand-name">HADIR</div><div class="brand-sub">${esc(c.nama)}</div></div></div><div class="nav-label">${t('Menu utama')}</div><nav class="nav" id="nav" aria-label="Menu utama"></nav><div class="side-bottom">v${APP_VERSION} · <span id="sideNet"></span></div></aside><div class="scrim" data-act="menu"></div><main class="main"><header class="topbar"><button class="icon-btn menu-btn" data-act="menu" aria-label="Menu">${ic('menu')}</button><div class="crumb"><span class="muted">HADIR</span> <span class="muted">/</span> <strong id="crumb"></strong></div><div class="top-right"><span class="net" id="netPill"></span><button class="icon-btn" data-act="syncnow" id="syncBtn" aria-label="Sinkron" title="Sinkron sekarang">${ic('refresh')}</button><button class="icon-btn bell" data-act="gonotif" aria-label="Notifikasi">${ic('bell')}<span id="bellN"></span></button><span class="role-pill">${esc(ME.role === 'admin' ? 'ADMIN' : 'PENGURUS')}</span><div class="avatar" title="${esc(ME.nama)}">${esc((ME.nama || '?')[0].toUpperCase())}</div><button class="logout" data-act="logout">${ic('logout')}<span>${t('Keluar')}</span></button></div></header><div class="content" id="view" tabindex="-1"></div></main><nav class="bnav" id="bnav" aria-label="Navigasi cepat"></nav>`;
   $('#nav').innerHTML = MENUS.filter(m => can(m.id)).map(m => `<button data-act="nav" data-p="${m.id}" id="nav_${m.id}">${ic(m.i)}<span>${esc(t(m.l))}</span><span class="nb" id="nb_${m.id}"></span></button>`).join('');
-  const lab = { dashboard: 'Beranda', santri: 'Santri', riwayat: 'Riwayat', laporan: 'Laporan', izin: 'Izin', kegiatan: 'Jadwal', notif: 'Notifikasi' };
-  const side = ['santri', 'riwayat', 'laporan', 'izin', 'kegiatan', 'notif'].filter(can), bi = id => `<button data-act="nav" data-p="${id}">${ic(MENUS.find(x => x.id === id).i)}<span>${lab[id]}</span></button>`;
-  const L = [can('dashboard') ? 'dashboard' : null, side[0]].filter(Boolean);
-  $('#bnav').innerHTML = L.map(bi).join('') + (can('absensi') ? `<button class="fab" data-act="nav" data-p="absensi" aria-label="Absensi">${ic('check')}</button>` : '') + (side[1] ? bi(side[1]) : '') + `<button data-act="menu">${ic('menu')}<span>Lainnya</span></button>`;
+  const nb = (id, label, icon) => `<button data-act="nav" data-p="${id}">${ic(icon)}<span>${label}</span></button>`;
+  const second = can('santri') ? ['santri', 'Santri', 'users'] : can('riwayat') ? ['riwayat', 'Riwayat', 'clock'] : null;
+  const third = can('laporan') ? ['laporan', 'Laporan', 'chart'] : can('izin') ? ['izin', 'Izin', 'file'] : null;
+  $('#bnav').innerHTML = (can('dashboard') ? nb('dashboard', 'Beranda', 'home') : '') + (second ? nb(...second) : '') + (can('absensi') ? `<button class="fab" data-act="nav" data-p="absensi" aria-label="Absen"><i>${ic('scan')}</i><span>Absen</span></button>` : '') + (third ? nb(...third) : '') + nb('lainnya', 'Lainnya', 'menu');
   updateNet();
 }
 ACT.nav = el => go(el.dataset.p);
@@ -400,16 +400,16 @@ async function go(id, push = true) {
   curPage = id; document.body.classList.remove('drawer');
   if (push && location.hash !== '#/' + id) history.replaceState(null, '', '#/' + id);
   $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.p === id));
-  $$('#bnav button[data-p]').forEach(b => b.classList.toggle('active', b.dataset.p === id)); document.body.dataset.page = id;
+  const SYS = ['pengaturan', 'akun', 'perangkat', 'sinkron', 'kelas', 'alumni', 'guru', 'wajah', 'kegiatan', 'notif', 'lainnya']; $$('#bnav button[data-p]').forEach(b => b.classList.toggle('active', b.dataset.p === id || (b.dataset.p === 'lainnya' && SYS.includes(id)))); document.body.dataset.page = id;
   $('#crumb').textContent = t(MENUS.find(m => m.id === id).l);
   const v = $('#view'); v.className = 'content leave';
-  await sleep(60); if (v !== $('#view') || curPage !== id) return;
+  await sleep(120); if (v !== $('#view') || curPage !== id) return;
   try { await PAGES[id].render(v); } catch (e) { console.error(e); v.innerHTML = `<div class="panel"><div class="empty">${ic('alert')}<p>Halaman gagal dimuat: ${esc(e.message)}</p></div></div>`; }
   v.className = 'content enter'; v.scrollTop = 0; scrollTo(0, 0); v.focus({ preventScroll: true });
   refreshBadges();
 }
 const refresh = () => curPage && go(curPage, false);
 async function refreshBadges() {
-  const n = await notifCount(); const b = $('#bellN'); if (b) b.innerHTML = UI.badge(n);
+  const n = await notifCount(); const b = $('#bellN'); if (b) b.innerHTML = UI.badge(n); const bm = $('#bellM'); if (bm) bm.innerHTML = UI.badge(n);
   const iz = canEdit('izin') ? DB.list('izin').filter(z => z.status === 'Menunggu').length : 0; const nb = $('#nb_izin'); if (nb) nb.innerHTML = UI.badge(iz);
 }

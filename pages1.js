@@ -1,6 +1,35 @@
 'use strict';
 /* HADIR — halaman: Dashboard, Santri, Kelas & Kamar, Alumni, Guru & Pengurus */
 
+/* ===== waktu sholat (hisab astronomi, kriteria Kemenag RI: Subuh 20°, Isya 18°, Ashar mazhab Syafi'i, ihtiyat +2 menit) ===== */
+const KOTA = [['Jakarta', -6.2088, 106.8456], ['Bandung', -6.9175, 107.6191], ['Semarang', -6.9667, 110.4167], ['Yogyakarta', -7.7956, 110.3695], ['Surabaya', -7.2575, 112.7521], ['Malang', -7.9797, 112.6304], ['Kediri', -7.848, 112.0178], ['Serang', -6.1201, 106.1503], ['Cirebon', -6.732, 108.5523], ['Medan', 3.5952, 98.6722], ['Palembang', -2.9761, 104.7754], ['Makassar', -5.1477, 119.4327], ['Banjarmasin', -3.3194, 114.5908], ['Pontianak', -0.0263, 109.3425], ['Mataram', -8.5833, 116.1167], ['Banda Aceh', 5.5483, 95.3238]];
+function prayerTimes(date, lat, lng) {
+  const rad = x => x * Math.PI / 180, deg = x => x * 180 / Math.PI, mod = (x, n) => x - n * Math.floor(x / n);
+  const tz = -date.getTimezoneOffset() / 60; let Y = date.getFullYear(), M = date.getMonth() + 1; const d = date.getDate(); if (M <= 2) { Y--; M += 12; }
+  const A = Math.floor(Y / 100), B = 2 - A + Math.floor(A / 4), jd = Math.floor(365.25 * (Y + 4716)) + Math.floor(30.6001 * (M + 1)) + d + B - 1524.5 + 0.5, D = jd - 2451545.0;
+  const g = mod(357.529 + 0.98560028 * D, 360), q = mod(280.459 + 0.98564736 * D, 360), L = mod(q + 1.915 * Math.sin(rad(g)) + 0.02 * Math.sin(rad(2 * g)), 360), e = 23.439 - 0.00000036 * D;
+  const RA = mod(deg(Math.atan2(Math.cos(rad(e)) * Math.sin(rad(L)), Math.cos(rad(L)))) / 15, 24), eqt = mod(q / 15 - RA + 12, 24) - 12, decl = deg(Math.asin(Math.sin(rad(e)) * Math.sin(rad(L))));
+  const noon = 12 + tz - lng / 15 - eqt, ang = a => deg(Math.acos(Math.max(-1, Math.min(1, (-Math.sin(rad(a)) - Math.sin(rad(lat)) * Math.sin(rad(decl))) / (Math.cos(rad(lat)) * Math.cos(rad(decl))))))) / 15;
+  const asrA = -deg(Math.atan(1 / (1 + Math.tan(rad(Math.abs(lat - decl))))));
+  const base = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime(), at = (h, plus = 2) => new Date(base + Math.round((mod(h, 24) * 60 + plus) * 60000));
+  return [['Subuh', at(noon - ang(20))], ['Terbit', at(noon - ang(0.833), -2)], ['Dzuhur', at(noon)], ['Ashar', at(noon + ang(asrA))], ['Maghrib', at(noon + ang(0.833))], ['Isya', at(noon + ang(18))]];
+}
+function nextPrayer(now = new Date()) {
+  const c = CFG(), day = d => prayerTimes(d, +c.lat, +c.lng).filter(x => x[0] !== 'Terbit'), today = day(now), nx = today.find(x => x[1] > now);
+  if (nx) return { name: nx[0], at: nx[1], all: today };
+  const tm = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1); return { name: 'Subuh', at: day(tm)[0][1], all: today };
+}
+const hm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function prayerInner() {
+  const now = new Date(), n = nextPrayer(now), mins = Math.max(0, Math.ceil((n.at - now) / 60000)), left = mins >= 60 ? `${Math.floor(mins / 60)} j ${mins % 60} m lagi` : `${mins} menit lagi`;
+  return `<span class="pc">${ic('clock')}<b>${hm(now)}</b></span><span class="pn">${n.name} ${hm(n.at)}</span><em>${left}</em>`;
+}
+ACT.prayer = () => {
+  const c = CFG(), now = new Date(), n = nextPrayer(now), all = prayerTimes(now, +c.lat, +c.lng);
+  UI.modal(`<div class="pray-list">${all.map(x => `<div class="pr ${x[0] === n.name && x[0] !== 'Terbit' ? 'next' : ''} ${x[1] < now ? 'past' : ''}"><span>${x[0]}</span><b>${hm(x[1])}</b></div>`).join('')}</div><p class="muted small" style="margin:12px 0 0">Lokasi: ${esc(c.kota || 'Kustom')} (${(+c.lat).toFixed(2)}, ${(+c.lng).toFixed(2)}). Perkiraan hisab sesuai kriteria Kemenag RI; selisih 1–3 menit dari jadwal resmi setempat bisa terjadi. ${isAdmin() ? 'Ubah lokasi di Pengaturan › Profil Pesantren.' : 'Admin dapat mengubah lokasi di Pengaturan.'}</p><div class="form-actions"><button class="btn" data-act="close">${t('Tutup')}</button></div>`, { title: 'Waktu Sholat Hari Ini' });
+};
+function startPrayerClock() { clearInterval(window._prayT); window._prayT = setInterval(() => { const el = $('#mpray'); if (!el) return clearInterval(window._prayT); el.innerHTML = prayerInner(); }, 20000); }
+
 /* ===== Dashboard ===== */
 PAGES.dashboard = {
   async render(v) {
@@ -17,19 +46,30 @@ PAGES.dashboard = {
     const days = [...Array(7)].map((_, i) => addDays(today, i - 6)).map(d => { const o = { label: fmtD(d).slice(0, 5) }; ST_KEYS.forEach(k => o[k] = recs.filter(r => r.date === d && r.status === k).length); return o; });
     const act = await DB.latest('log', 8), nots = (await buildNotifs()).filter(n => !n.read).slice(0, 4);
     const quick = [['absensi', 'Buka Absensi', 'check'], ['santri', 'Data Santri', 'users'], ['izin', 'Perizinan', 'file'], ['riwayat', 'Riwayat', 'clock'], ['laporan', 'Laporan', 'chart'], ['wajah', 'Daftar Wajah', 'face']].filter(q => can(q[0]));
-    const hr = new Date().getHours(), salam = hr < 11 ? 'Selamat pagi' : hr < 15 ? 'Selamat siang' : hr < 18 ? 'Selamat sore' : 'Selamat malam', kgs = todayKegiatan(), dflt = DB.get('kegiatan', defaultKegiatan());
-    const R = 44, CI = 2 * Math.PI * R;
-    v.innerHTML = `<div class="m-only m-top"><div class="m-hero"><div><small>Kehadiran hari ini</small><b>${cnt.hadir + cnt.terlambat} <span>/ ${aktif.length} santri</span></b>${can('absensi') ? `<button class="m-gold" data-act="nav" data-p="absensi">${dflt ? esc(dflt.nama) : 'Buka absensi'}</button>` : ''}</div>
-      <svg viewBox="0 0 110 110" class="ring"><circle cx="55" cy="55" r="${R}" class="rb"/><circle cx="55" cy="55" r="${R}" class="rf" stroke-dasharray="${(CI * pct / 100).toFixed(1)} ${CI.toFixed(1)}" transform="rotate(-90 55 55)"/><text x="55" y="61" text-anchor="middle">${pct}%</text></svg></div>
-      <div class="m-tiles"><div class="m-tile"><small>Belum absen</small><b>${belum}</b></div><div class="m-tile warm"><small>Izin / Sakit / Alfa</small><b>${cnt.izin} / ${cnt.sakit} / ${cnt.alfa}</b></div></div>
-      <h3 class="m-h">Jadwal hari ini</h3><div class="m-list">${kgs.length ? kgs.slice(0, 5).map(k => `<div class="m-item"><b>${esc(k.nama)}</b><span>${esc(k.jamMulai)}</span></div>`).join('') : '<div class="m-item"><span>Tidak ada kegiatan hari ini</span></div>'}</div></div>
+    const kgs = todayKegiatan(), dflt = DB.get('kegiatan', defaultKegiatan()), ws = dflt ? windowStatus(dflt) : null, open = !!ws && (ws.s === 'hadir' || ws.s === 'terlambat');
+    const doneKg = dflt ? new Set(tod.filter(r => r.kegiatanId === dflt.id).map(r => r.santriId)).size : 0, totKg = dflt ? aktif.filter(s => targetMatch(dflt, s)).length : 0;
+    const hijri = new Intl.DateTimeFormat('id-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+    const heroT = !dflt ? 'Tidak ada kegiatan hari ini' : open ? `Absensi ${dflt.nama} dibuka` : ws.s === 'belum' ? `${dflt.nama} belum dibuka` : `${dflt.nama} sudah ditutup`;
+    const heroS = !dflt ? 'Atur jadwal di menu Kegiatan & Jadwal' : `${doneKg} dari ${totKg} santri sudah absen`;
+    const qlist = [['riwayat', 'Riwayat Kehadiran', 'clock'], ['izin', 'Perizinan', 'file'], ['kegiatan', 'Jadwal', 'calendar'], ['notif', 'Notifikasi', 'bell'], ['laporan', 'Laporan', 'chart'], ['santri', 'Data Santri', 'users']].filter(x => can(x[0])).slice(0, 4);
+    const ann = DB.list('pengumuman').filter(x => x.aktif !== false).sort((x, y) => y.updatedAt - x.updatedAt)[0];
+    const logo = '<svg viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="#C9A24B" stroke-width="2"><rect x="9" y="9" width="30" height="30"/><rect x="9" y="9" width="30" height="30" transform="rotate(45 24 24)"/></g><circle cx="24" cy="24" r="10" fill="#1F6B45"/><circle cx="27.5" cy="22" r="8" fill="#fff"/></svg>';
+    const mob = `<div class="m-only m-top"><div class="m-brand"><div class="m-logo">${logo}</div><div class="m-bt"><div class="m-name">Hadir</div><small>${esc(CFG().nama)}</small></div><button class="m-pray" id="mpray" data-act="prayer" aria-label="Waktu sholat">${prayerInner()}</button></div>
+      <div class="m-date"><span class="star">${ic('calendar')}</span><div><b>${esc(longDate())}</b><small>${esc(hijri)}</small></div><button class="m-bell" data-act="gonotif" aria-label="Notifikasi">${ic('bell')}<span id="bellM"></span></button></div>
+      <div class="m-hero2"><div class="m-hrow"><span class="m-pin">${ic('building')}</span><div><b>${esc(heroT)}</b><small>${esc(heroS)}</small><em>${ic('pin')} ${esc(CFG().nama)}</em></div></div>${can('absensi') ? `<button class="m-cta" data-act="nav" data-p="absensi">${ic('scan')}<span>${open ? 'Mulai Absen' : 'Buka Absensi'}</span></button>` : ''}</div>
+      <div class="m-sec"><h3>Menu Cepat</h3><button class="m-link" data-act="nav" data-p="lainnya">Menu Lainnya ›</button></div>
+      <div class="m-menu">${qlist.map(q => `<button data-act="nav" data-p="${q[0]}"><span class="star">${ic(q[2])}</span><b>${q[1]}</b></button>`).join('')}</div>
+      <div class="m-card"><div class="m-sec"><h3>Ringkasan Kehadiran</h3><small>Hari ini</small></div><div class="m-sum">${[['check', cnt.hadir, 'Hadir'], ['x', cnt.alfa, 'Tidak Hadir'], ['clock', cnt.terlambat, 'Terlambat'], ['file', cnt.izin + cnt.sakit, 'Izin / Sakit']].map(x => `<div><span class="star sm">${ic(x[0])}</span><b>${x[1]}</b><small>${x[2]}</small></div>`).join('')}</div></div>
+      <div class="m-card"><div class="m-sec"><h3>Pengumuman</h3><button class="m-link" data-act="nav" data-p="notif">Lihat Semua ›</button></div>${ann ? `<div class="m-ann"><span class="star">${ic('megaphone')}</span><div><b>${esc(ann.judul)}</b><p>${esc(ann.isi)}</p><small>${ic('calendar')} ${new Date(ann.updatedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</small></div></div>` : '<p class="muted small" style="margin:6px 0 0">Belum ada pengumuman.</p>'}</div></div>`;
+    startPrayerClock();
+    v.innerHTML = `${mob}
     <div class="d-only">${pageHead(`${t('Selamat datang')}, ${ME.nama}`, longDate())}</div>
     <div class="grid g4 d-only">${statCard('users', aktif.length, 'Total Santri')}${statCard('users', put, 'Santri Putra')}${statCard('users', putri, 'Santri Putri')}${statCard('badge', `${g} / ${p}`, 'Guru / Pengurus')}</div>
     <div class="panel mt d-only"><div class="panel-h"><div><h2>${t('Kehadiran hari ini')}</h2><p class="sub">${pct}% ${t('Persentase kehadiran').toLowerCase()} · ${belum} ${t('Belum absen').toLowerCase()}</p></div></div>
       <div class="grid g5">${ST_KEYS.map(k => `<div class="mini st-${k}"><b>${cnt[k]}</b><span>${t(ST[k])}</span></div>`).join('')}</div>
       <div class="meter"><span style="width:${pct}%"></span></div></div>
     <div class="cols mt"><section class="panel"><div class="panel-h"><h2>${t('Grafik kehadiran 7 hari')}</h2></div>${stackBars(days)}</section>
-      <section class="panel"><div class="panel-h"><h2>${t('Akses cepat')}</h2></div><div class="quick">${quick.map(q => `<button data-act="nav" data-p="${q[0]}">${ic(q[2])}<b>${t(MENUS.find(m => m.id === q[0]).l)}</b></button>`).join('')}</div></section></div>
+      <section class="panel d-only"><div class="panel-h"><h2>${t('Akses cepat')}</h2></div><div class="quick">${quick.map(q => `<button data-act="nav" data-p="${q[0]}">${ic(q[2])}<b>${t(MENUS.find(m => m.id === q[0]).l)}</b></button>`).join('')}</div></section></div>
     <div class="cols mt"><section class="panel"><div class="panel-h"><h2>${t('Notifikasi & peringatan')}</h2><button class="btn secondary small" data-act="gonotif">${t('Semua')}</button></div>${nots.length ? nots.map(n => `<div class="nrow ${n.tipe}">${ic(n.tipe === 'alfa' || n.tipe === 'telat' ? 'alert' : n.tipe === 'izin' ? 'file' : 'megaphone')}<div><b>${esc(n.judul)}</b><small>${esc(n.isi)}</small></div></div>`).join('') : `<div class="empty small">${ic('bell')}<p>Tidak ada notifikasi baru.</p></div>`}</section>
       <section class="panel"><div class="panel-h"><h2>${t('Aktivitas terbaru')}</h2></div>${act.length ? act.map(a => `<div class="arow"><i></i><div><b>${esc(a.user)}</b> · ${esc(a.aksi)}<small>${esc(a.detail)} — ${new Date(a.ts).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</small></div></div>`).join('') : `<div class="empty small">${ic('clock')}<p>Belum ada aktivitas.</p></div>`}</section></div>`;
   }
@@ -208,3 +248,13 @@ function guruForm(id) { const old = id ? DB.get('guru', id) : null; formModal({ 
 ACT.gadd = () => guruForm(); ACT.gedit = el => guruForm(el.dataset.id);
 ACT.gtoggle = async el => { const g = DB.get('guru', el.dataset.id); await DB.put('guru', { ...g, aktif: g.aktif === false }); LOG('Ubah status guru', g.nama); refresh(); };
 ACT.gdel = async el => { const g = DB.get('guru', el.dataset.id); if (!await UI.confirm(`Hapus ${g.nama}?`, { ok: 'Hapus', danger: true })) return; for (const a of DB.list('akun').filter(a => a.guruId === g.id)) await DB.put('akun', { ...a, guruId: '' }); await DB.del('guru', g.id); LOG('Hapus guru', g.nama); refresh(); };
+
+/* ===== Lainnya (pengaturan & menu jarang dipakai) ===== */
+PAGES.lainnya = {
+  render(v) {
+    const G = [['Pengaturan & sistem', ['pengaturan', 'akun', 'perangkat', 'sinkron']], ['Data pesantren', ['kelas', 'alumni', 'guru', 'wajah', 'kegiatan']], ['Menu utama', ['santri', 'absensi', 'riwayat', 'izin', 'laporan', 'notif']]];
+    const sub = { pengaturan: 'Profil, tema, bahasa, kata sandi', akun: 'Akun pengurus dan izin menu', perangkat: 'Tablet, kamera, status', sinkron: 'Sinkron, backup dan pemulihan', kelas: 'Kelas, kamar, penempatan', alumni: 'Data lulusan', guru: 'Guru dan pengurus', wajah: 'Daftarkan wajah santri', kegiatan: 'Jadwal dan jam absensi', santri: 'Identitas dan wali', absensi: 'Catat kehadiran', riwayat: 'Riwayat dan koreksi', izin: 'Izin dan sakit', laporan: 'Rekap dan statistik', notif: 'Peringatan dan pengumuman' };
+    v.innerHTML = `${pageHead('Lainnya', 'Pengaturan dan menu pendukung.')}${G.map(([h, ids]) => { const l = ids.filter(can); return l.length ? `<h3 class="lh">${h}</h3><div class="lgroup">${l.map(id => { const m = MENUS.find(x => x.id === id); return `<button class="lrow" data-act="nav" data-p="${id}"><span class="star sm">${ic(m.i)}</span><div><b>${esc(t(m.l))}</b><small>${esc(sub[id] || '')}</small></div>${ic('back', 'chev')}</button>`; }).join('')}</div>` : ''; }).join('')}
+    <h3 class="lh">Akun</h3><div class="lgroup"><button class="lrow" data-act="logout"><span class="star sm">${ic('logout')}</span><div><b>${t('Keluar')}</b><small>${esc(ME.nama)} · ${ME.role === 'admin' ? 'Admin' : 'Pengurus'}</small></div>${ic('back', 'chev')}</button></div>`;
+  }
+};
